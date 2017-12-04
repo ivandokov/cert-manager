@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+
+set -e
+
+DIR=`pwd`
+
+function askForDomain {
+    DOMAIN="$1"
+    while true; do
+        if [ -z "${DOMAIN}" ]; then
+            read -p "Domain: " DOMAIN
+        else
+            break
+        fi
+    done
+}
+
+function askForKey {
+    while true; do
+        if [ -z "${KEY}" ]; then
+            echo "[PRIVATE KEY] Paste and press Ctrl-D on new line:"
+            KEY=$(cat)
+            KEY=$(echo "${KEY}" | sed '/^$/d')
+        else
+            break
+        fi
+    done
+}
+
+function askForCertificate {
+    while true; do
+        if [ -z "${CERTIFICATE}" ]; then
+            echo "[CERTIFICATE] Paste and press Ctrl-D on new line:"
+            CERTIFICATE=$(cat)
+            CERTIFICATE=$(echo "${CERTIFICATE}" | sed '/^$/d')
+        else
+            break
+        fi
+    done
+}
+
+function askForCABundle {
+    while true; do
+        if [ -z "${CABUNDLE}" ]; then
+            echo "[Certificate Authority Bundle / Root certificate] Paste and press Ctrl-D on new line:"
+            CABUNDLE=$(cat)
+            CABUNDLE=$(echo "${CABUNDLE}" | sed '/^$/d')
+        else
+            break
+        fi
+    done
+}
+
+case $1 in
+    request)
+        askForDomain $2
+        openssl req -new -newkey rsa:2048 -nodes -keyout "${DOMAIN}.key" -out "${DOMAIN}.csr"
+        ;;
+    create)
+        askForDomain $2
+
+        if [ ! -f "${DOMAIN}.key" ]; then
+            askForKey
+            echo "${KEY}" > "${DOMAIN}.key"
+        fi
+
+        askForCertificate
+        echo "${CERTIFICATE}" > "${DOMAIN}.crt"
+
+        askForCABundle
+        echo "${CABUNDLE}" > "${DOMAIN}.cab"
+
+        echo
+        echo
+        echo -n "Combining files together... "
+        cat "${DOMAIN}.crt" "${DOMAIN}.cab" > "${DOMAIN}.chained.crt"
+
+        echo "Done!"
+        ;;
+    serverconfig)
+        askForDomain $2
+
+        if [ ! -f "${DOMAIN}.chained.crt" ]; then
+            echo "File ${DOMAIN}.chained.crt is not found in this directory!"
+            exit
+        fi
+
+        echo "NGINX"
+        echo "#--------- START ----------#"
+        echo "server {"
+        echo "       listen         80;"
+        echo "       server_name    ${DOMAIN};"
+        echo "       return         301 https://\$server_name\$request_uri;"
+        echo "}"
+        echo ""
+        echo "server {"
+        echo "        listen        443 ssl;"
+        echo "        server_name   ${DOMAIN};"
+        echo "        root          /CHANGE_ME_TO_YOUR_WEB_ROOT;"
+        echo "        index         index.html;"
+        echo "        charset       utf-8;"
+        echo ""
+        echo "        ssl on;"
+        echo "        ssl_certificate     ${DIR}/${DOMAIN}.chained.crt;"
+        echo "        ssl_certificate_key ${DIR}/${DOMAIN}.key;"
+        echo "}"
+        echo "#---------- END -----------#"
+        echo
+        echo "APACHE"
+        echo "#--------- START ----------#"
+        echo "<VirtualHost *:443>"
+        echo " ServerName ${DOMAIN}"
+        echo " DocumentRoot /CHANGE_ME_TO_YOUR_WEB_ROOT"
+        echo " SSLEngine on"
+        echo " SSLCertificateFile ${DIR}/${DOMAIN}.chained.crt"
+        echo " SSLCertificateKeyFile ${DIR}/${DOMAIN}.key"
+        echo "</VirtualHost>"
+        echo "#---------- END -----------#"
+        ;;
+    *)
+        echo 'Invalid argument!'
+        echo ''
+        echo '  request [domain]'
+        echo '  create'
+        echo '  serverconfig'
+        echo ''
+        ;;
+esac

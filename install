@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+set -e
+
+sudo apt-get install openssl
+echo "Linking cert-manager globally"
+sudo ln -s $(pwd)/cert-manager /usr/local/bin/cert-manager
