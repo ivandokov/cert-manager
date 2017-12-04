@@ -12,7 +12,7 @@ cd cert-manager
 
 ## Usage
 
-### Create
+### Request
 Create new certificate signing request. This file is required from the company which issues your certificate. Optionally you can use your hosting provider to generate one for you, but not all providers have this option.
 ```bash
 cert-manager request
@@ -25,7 +25,7 @@ cert-manager create
 ```
 
 ### Server configuration
-The script does not provide server configuration out-of-the-box because this is not its purpose. You can get some basic configuration for nginx and Apache by running the command below.
+The script does not provide server configuration out-of-the-box because this is not its purpose. You can get some basic configuration for nginx and Apache by running the command below. If you do not want to manage the web server take a look at my [site](https://github.com/ivandokov/site) tool.
 ```bash
 cert-manager serverconfig
 ```
